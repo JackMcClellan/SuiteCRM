@@ -126,3 +126,12 @@ codeception.yml
 .env
 .env.test
 .env.dev
+
+
+# Ignore docker related files
+docker/
+docker/volumes/
+docker/volumes/database/
+docker/volumes/suitecrm/
+docker/volumes/logs/
+docker/volumes/backups/
