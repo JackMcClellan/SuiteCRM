@@ -44,8 +44,19 @@
 .warn { font-style:italic;
         font-weight:bold;
         color:red;
-}{/literal}
+}
+.error-message { 
+    color: #F08377; /* Primary app color */
+    font-weight:bold;
+}
+.error-message b {
+    font-weight:bold;
+}
+{/literal}
 </style>
+
+{* Include theme-specific colors if available *}
+<link rel="stylesheet" type="text/css" href="{sugar_getjspath file='themes/SuiteP/css/colourSelector.php'}" />
 
 <script type='text/javascript' src='{sugar_getjspath file='include/javascript/popup_helper.js'}'></script>
 
@@ -81,7 +92,11 @@
                 {foreach from=$rowData key=col item=params}
                     {strip}
                     <td align='left' valign="top" scope="record">
-                        {$params}
+                    {if $tableID == 'errors' and ($col == 'error' or $col == 'message' or $col == 'error_message' or strpos($col, 'error') !== false)}
+                            <span class="error-message">{$params nofilter}</span>
+                        {else}
+                            {$params}
+                        {/if}
                     </td>
                     {/strip}
                     {counter name="colCounter"}

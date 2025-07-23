@@ -1,55 +1,33 @@
 version: '3.8'
 
 services:
-  mariadb:
-    image: docker.io/bitnami/mariadb:11.2
+  mysql:
+    image: mysql:8.0
     restart: unless-stopped
     environment:
-      # Allow empty password is set to yes for development
-      - ALLOW_EMPTY_PASSWORD=yes
-      - MARIADB_USER=suitecrm
-      - MARIADB_PASSWORD=suitecrm_password
-      - MARIADB_DATABASE=suitecrm
-      - MARIADB_CHARACTER_SET=utf8
-      - MARIADB_COLLATE=utf8_general_ci
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=suitecrm
+      - MYSQL_USER=suitecrm
+      - MYSQL_PASSWORD=suitecrm
     volumes:
-      - './docker/volumes/database:/bitnami/mariadb'
+      - mysql_data:/var/lib/mysql
     networks:
       - suitecrm
 
   suitecrm:
-    image: docker.io/bitnami/suitecrm:8.8.0
+    image: webdevops/php-apache:7.4
     restart: unless-stopped
     ports:
-      - '8080:8080'
-      - '8443:8443'
-    environment:
-      # Database configuration
-      - SUITECRM_DATABASE_HOST=mariadb
-      - SUITECRM_DATABASE_PORT_NUMBER=3306
-      - SUITECRM_DATABASE_USER=suitecrm
-      - SUITECRM_DATABASE_PASSWORD=suitecrm_password
-      - SUITECRM_DATABASE_NAME=suitecrm
-      
-      # SuiteCRM admin configuration
-      - SUITECRM_USERNAME=admin
-      - SUITECRM_PASSWORD=bitnami123
-      - SUITECRM_EMAIL=admin@example.com
-      - SUITECRM_LAST_NAME=Administrator
-      - SUITECRM_HOST=localhost
-      - SUITECRM_ENABLE_HTTPS=false
-      - SUITECRM_VALIDATE_USER_IP=false
+      - '8080:80'
     volumes:
-      - 'suitecrm_data:/bitnami/suitecrm'
+      - '.:/app'
     depends_on:
-      - mariadb
+      - mysql
     networks:
       - suitecrm
 
 volumes:
-  suitecrm_data:
-    driver: local
-  mariadb_data:
+  mysql_data:
     driver: local
 
 networks:
