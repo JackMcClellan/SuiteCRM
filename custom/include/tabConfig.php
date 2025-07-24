@@ -29,16 +29,21 @@ $GLOBALS["tabStructure"] =array (
       6 => 'ProspectLists',
     ),
   ),
-  'LBL_TABGROUP_SUPPORT' => 
+  'LBL_TABGROUP_MANUFACTURING' => 
   array (
-    'label' => 'LBL_TABGROUP_SUPPORT',
+    'label' => 'LBL_TABGROUP_MANUFACTURING',
     'modules' => 
     array (
       0 => 'Home',
-      1 => 'Accounts',
-      2 => 'Contacts',
-      3 => 'Cases',
-      4 => 'Bugs',
+      1 => 'AOS_Products',
+      2 => 'AOS_Product_Categories',
+      3 => 'AOS_Contracts',
+      4 => 'AOS_Quotes',
+      5 => 'Project',
+      6 => 'Cases',
+      7 => 'Documents',
+      8 => 'Accounts',
+      9 => 'Contacts',
     ),
   ),
   'LBL_TABGROUP_ACTIVITIES' => 
@@ -53,17 +58,6 @@ $GLOBALS["tabStructure"] =array (
       4 => 'Emails',
       5 => 'Tasks',
       6 => 'Notes',
-    ),
-  ),
-  'LBL_TABGROUP_COLLABORATION' => 
-  array (
-    'label' => 'LBL_TABGROUP_COLLABORATION',
-    'modules' => 
-    array (
-      0 => 'Home',
-      1 => 'Emails',
-      2 => 'Documents',
-      3 => 'Project',
     ),
   ),
 );

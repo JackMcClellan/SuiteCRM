@@ -25,10 +25,14 @@ This plan outlines the steps to customize SuiteCRM for manufacturing companies, 
 - [x] Customize the top navigation bar for manufacturing.
   - Added Manufacturing tab group to custom/include/tabConfig.php with relevant modules (Products, Contracts, Quotes, Projects, etc.).
   - Added language string LBL_TABGROUP_MANUFACTURING = 'Manufacturing' in custom/include/language/en_us.lang.php.
+  - Removed Support and Collaboration tabs as requested.
   - Ensure backward compatibility for non-manufacturing users.
 
-- [ ] Simplify and customize the dashboard.
-  - Add dashlets for production status, quality metrics, supply chain alerts.
+- [x] Simplify and customize the dashboard.
+  - Created ManufacturingDashlet with placeholder metrics and SVG chart in custom/modules/Home/Dashlets/ManufacturingDashlet/.
+  - Added production status, quality score, efficiency, and active orders display.
+  - Included placeholder chart showing production timeline with sample data.
+  - Ready for connection to real manufacturing data sources.
   - Modify MySugar.tpl to include manufacturing-themed layouts.
   - Implement dual-scale design for small vs. large manufacturers.
 

@@ -114,6 +114,8 @@ custom/*
 !custom/include/
 custom/modules/**/*
 !custom/modules/*/metadata/
+# Allow Manufacturing dashlet files for custom manufacturing features
+!custom/modules/Home/Dashlets/ManufacturingDashlet/
 .sass-cache/
 
 # Ignore testing environment
