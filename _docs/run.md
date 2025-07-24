@@ -36,7 +36,7 @@ On first access, you'll need to complete the SuiteCRM installation:
    - **Database Host**: `mysql`
    - **Database Name**: `suitecrm`
    - **Database User**: `suitecrm`  
-   - **Database Password**: `suitecrm`
+   - **Database Password**: `suitecrm_password`
 
 ## Development Workflow
 
