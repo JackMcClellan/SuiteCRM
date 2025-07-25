@@ -73,20 +73,237 @@ class AOS_Products extends AOS_Products_sugar
             }
         }
 
-        if (!empty($_FILES['uploadimage']['tmp_name']) && verify_uploaded_image($_FILES['uploadimage']['tmp_name'])) {
-            if ($_FILES['uploadimage']['size'] > $sugar_config['upload_maxsize']) {
-                die($mod_strings['LBL_IMAGE_UPLOAD_FAIL'] . $sugar_config['upload_maxsize']);
-            }
-            $prefix_image = $this->getGUID() . '_';
-            $this->product_image = $sugar_config['site_url'] . '/' . $sugar_config['upload_dir'] . $prefix_image . $_FILES['uploadimage']['name'];
-            move_uploaded_file($_FILES['uploadimage']['tmp_name'], $sugar_config['upload_dir'] . $prefix_image . $_FILES['uploadimage']['name']);
+        $upload_file = new UploadFile('uploadimage');
+
+        if (isset($_FILES['uploadimage']) && $upload_file->confirm_upload()) {
+            $this->product_image = $upload_file->get_stored_file_name();
+            $upload_file->final_move($this->product_image);
         }
 
+        // Original AOS functionality
         require_once('modules/AOS_Products_Quotes/AOS_Utils.php');
-
         perform_aos_save($this);
 
+        // Calculate inventory status before saving
+        $this->calculateInventoryStatus();
+        
+        // Auto-calculate reorder points and forecasts if enabled
+        $this->calculateReorderPoint();
+        $this->calculateForecastDemand();
+        
+        // Update last inventory check timestamp (store UTC in DB)
+        global $timedate;
+        if (!isset($timedate)) {
+            require_once('include/TimeDate.php');
+            $timedate = new TimeDate();
+        }
+        $this->last_inventory_check = $timedate->nowDb();
+
         return parent::save($check_notify);
+    }
+
+    /**
+     * Calculate inventory status based on current level and thresholds
+     */
+    public function calculateInventoryStatus()
+    {
+        try {
+            $currentLevel = intval($this->inventory_level);
+            $criticalThreshold = intval($this->threshold_critical);
+            $lowThreshold = intval($this->threshold_low);
+            
+            // Set default thresholds if not set
+            if ($criticalThreshold <= 0) {
+                $criticalThreshold = 5;
+            }
+            if ($lowThreshold <= 0) {
+                $lowThreshold = 10;
+            }
+            
+            // Calculate status based on levels
+            if ($currentLevel <= 0) {
+                $this->inventory_status = 'Out_of_Stock';
+            } elseif ($currentLevel <= $criticalThreshold) {
+                $this->inventory_status = 'Critical';
+            } elseif ($currentLevel <= $lowThreshold) {
+                $this->inventory_status = 'Low';
+            } elseif ($currentLevel > ($lowThreshold * 3)) {
+                $this->inventory_status = 'Excess';
+            } else {
+                $this->inventory_status = 'Normal';
+            }
+            
+            LoggerManager::getLogger()->info("Inventory status calculated for {$this->name}: Status={$this->inventory_status}, Level={$currentLevel}, Critical={$criticalThreshold}, Low={$lowThreshold}");
+            
+        } catch (Exception $e) {
+            LoggerManager::getLogger()->error("Error calculating inventory status for product {$this->id}: " . $e->getMessage());
+            $this->inventory_status = 'Normal'; // Default to normal on error
+        }
+    }
+
+    /**
+     * Calculate reorder point based on historical usage and lead time
+     * Formula: (Average Daily Usage * Lead Time Days) + Safety Stock
+     */
+    public function calculateReorderPoint()
+    {
+        try {
+            // Get average daily usage from historical data (last 90 days)
+            $averageDailyUsage = $this->getAverageDailyUsage(90);
+            
+            // Assume 14-day lead time (can be made configurable)
+            $leadTimeDays = 14;
+            
+            // Calculate reorder point
+            $calculatedReorderPoint = ($averageDailyUsage * $leadTimeDays) + intval($this->safety_stock);
+            
+            // Only update if there's a significant change (more than 10% difference)
+            $currentReorderPoint = intval($this->reorder_point);
+            if ($currentReorderPoint == 0 || abs($calculatedReorderPoint - $currentReorderPoint) / $currentReorderPoint > 0.1) {
+                $this->reorder_point = max(1, $calculatedReorderPoint); // Minimum of 1
+            }
+            
+            LoggerManager::getLogger()->debug("Calculated reorder point for {$this->name}: {$this->reorder_point}");
+            
+        } catch (Exception $e) {
+            LoggerManager::getLogger()->error("Error calculating reorder point for product {$this->id}: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Calculate forecast demand for the next period based on historical trends
+     * Uses a simple moving average with trend adjustment
+     */
+    public function calculateForecastDemand()
+    {
+        try {
+            // Get usage data for last 3 months for trend analysis
+            $usage30Days = $this->getUsageForPeriod(30);
+            $usage60Days = $this->getUsageForPeriod(60);
+            $usage90Days = $this->getUsageForPeriod(90);
+
+            if ($usage30Days > 0 && $usage60Days > 0 && $usage90Days > 0) {
+                // Calculate trend (simple linear trend)
+                $trend = ($usage30Days - $usage60Days) * 0.5; // Weight recent data more
+                
+                // Base forecast on 30-day average with trend adjustment
+                $baseForecast = $usage30Days;
+                $forecastDemand = max(0, round($baseForecast + $trend));
+                
+                $this->forecast_demand = $forecastDemand;
+                
+                LoggerManager::getLogger()->debug("Calculated forecast demand for {$this->name}: {$this->forecast_demand}");
+            }
+            
+        } catch (Exception $e) {
+            LoggerManager::getLogger()->error("Error calculating forecast demand for product {$this->id}: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get average daily usage over a specified period
+     */
+    private function getAverageDailyUsage($days)
+    {
+        $totalUsage = $this->getUsageForPeriod($days);
+        return $days > 0 ? round($totalUsage / $days, 2) : 0;
+    }
+
+    /**
+     * Get total usage/consumption for a specific period
+     * This looks at AOS_Products_Quotes to estimate consumption
+     */
+    private function getUsageForPeriod($days)
+    {
+        global $db;
+        
+        $startDate = date('Y-m-d', strtotime("-{$days} days"));
+        
+        // Query to get total quantity sold/quoted in the period
+        $query = "
+            SELECT COALESCE(SUM(pq.product_qty), 0) as total_usage
+            FROM aos_products_quotes pq
+            INNER JOIN aos_quotes q ON pq.parent_id = q.id
+            WHERE pq.product_id = " . $db->quoted($this->id) . "
+            AND pq.deleted = 0
+            AND q.deleted = 0
+            AND q.date_entered >= " . $db->quoted($startDate) . "
+            AND q.stage IN ('Delivered', 'Closed Accepted')
+        ";
+
+        $result = $db->query($query);
+        if ($result && $row = $db->fetchByAssoc($result)) {
+            return floatval($row['total_usage']);
+        }
+        
+        return 0;
+    }
+
+    /**
+     * Check if product needs reordering
+     */
+    public function needsReordering()
+    {
+        return intval($this->inventory_level) <= intval($this->reorder_point);
+    }
+
+    /**
+     * Get inventory status color for UI display
+     */
+    public function getInventoryStatusColor()
+    {
+        switch ($this->inventory_status) {
+            case 'Critical':
+                return '#FF0000'; // Red
+            case 'Low':
+                return '#FFA500'; // Orange
+            case 'Out_of_Stock':
+                return '#8B0000'; // Dark Red
+            case 'Excess':
+                return '#0000FF'; // Blue
+            case 'Normal':
+            default:
+                return '#008000'; // Green
+        }
+    }
+
+    /**
+     * Get inventory status display for views
+     */
+    public function getInventoryStatusDisplay()
+    {
+        $color = $this->getInventoryStatusColor();
+        $status = $this->inventory_status;
+        
+        // Convert status to display format
+        $displayStatus = str_replace('_', ' ', $status);
+        
+        return "<span style='color: {$color}; font-weight: bold;'>{$displayStatus}</span>";
+    }
+
+    /**
+     * Check if inventory is below reorder point
+     */
+    public function isReorderNeeded()
+    {
+        return $this->needsReordering();
+    }
+
+    /**
+     * Manual inventory adjustment method
+     */
+    public function adjustInventory($adjustment, $reason = '')
+    {
+        $oldLevel = intval($this->inventory_level);
+        $this->inventory_level = max(0, $oldLevel + $adjustment);
+        
+        // Log the adjustment
+        LoggerManager::getLogger()->info("Inventory adjusted for {$this->name}: {$oldLevel} -> {$this->inventory_level} (Reason: {$reason})");
+        
+        // Trigger save to update status
+        $this->save();
+        
+        return $this->inventory_level;
     }
 
     public function getCustomersPurchasedProductsQuery()

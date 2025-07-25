@@ -116,6 +116,13 @@ custom/modules/**/*
 !custom/modules/*/metadata/
 # Allow Manufacturing dashlet files for custom manufacturing features
 !custom/modules/Home/Dashlets/ManufacturingDashlet/
+# Allow Manufacturing feature files to be tracked in git
+!custom/Extension/modules/Home/Ext/Language/en_us.manufacturing_dashlet.php
+!custom/Extension/modules/Opportunities/Ext/
+!custom/Extension/modules/AOS_Products/Ext/
+!custom/modules/Home/Dashlets/ManufacturingOverviewDashlet/
+!custom/modules/Opportunities/logic_hooks.php
+!custom/modules/Opportunities/OpportunityLogicHook.php
 .sass-cache/
 
 # Ignore testing environment

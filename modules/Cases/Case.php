@@ -402,4 +402,160 @@ class aCase extends Basic
 
         return $ret_array;
     }
+
+    public function save($check_notify = false)
+    {
+        // Auto-populate QC inspection date if not set
+        if (empty($this->qc_inspection_date) && !empty($this->qc_inspector_id)) {
+            $this->qc_inspection_date = gmdate('Y-m-d H:i:s');
+        }
+
+        // Log audit trail for quality control changes
+        $this->logQualityControlAudit();
+
+        return parent::save($check_notify);
+    }
+
+    /**
+     * Log quality control audit trail
+     */
+    public function logQualityControlAudit()
+    {
+        global $current_user;
+        
+        try {
+            $auditEntries = array();
+            $timestamp = date('Y-m-d H:i:s');
+            $userName = $current_user->name ?? 'System';
+            
+            // Check if this is a new record or existing
+            $isNew = empty($this->fetched_row);
+            
+            if ($isNew) {
+                if (!empty($this->qc_batch_number) || !empty($this->qc_defect_category)) {
+                    $auditEntries[] = "[{$timestamp}] Quality control case created by {$userName}";
+                }
+            } else {
+                // Check for changes in quality control fields
+                $qcFields = array(
+                    'qc_batch_number' => 'Batch Number',
+                    'qc_defect_category' => 'Defect Category',
+                    'qc_severity_level' => 'Severity Level',
+                    'qc_quantity_affected' => 'Quantity Affected',
+                    'qc_product_id' => 'Related Product',
+                    'qc_inspector_id' => 'Quality Inspector',
+                    'qc_inspection_date' => 'Inspection Date'
+                );
+                
+                foreach ($qcFields as $field => $label) {
+                    $oldValue = $this->fetched_row[$field] ?? '';
+                    $newValue = $this->$field ?? '';
+                    
+                    if ($oldValue != $newValue) {
+                        $auditEntries[] = "[{$timestamp}] {$label} changed from '{$oldValue}' to '{$newValue}' by {$userName}";
+                    }
+                }
+            }
+            
+            // Add entries to audit trail
+            if (!empty($auditEntries)) {
+                $existingAuditTrail = trim($this->qc_audit_trail ?? '');
+                $newEntries = implode("\n", $auditEntries);
+                
+                if (!empty($existingAuditTrail)) {
+                    $this->qc_audit_trail = $existingAuditTrail . "\n" . $newEntries;
+                } else {
+                    $this->qc_audit_trail = $newEntries;
+                }
+            }
+            
+        } catch (Exception $e) {
+            LoggerManager::getLogger()->error("Error logging quality control audit: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get quality control metrics for reporting
+     */
+    public function getQualityMetrics($caseId = null)
+    {
+        global $db;
+        
+        $targetCaseId = $caseId ?? $this->id;
+        if (empty($targetCaseId)) {
+            return array();
+        }
+        
+        $metrics = array();
+        
+        try {
+            // Get metrics for similar defect categories
+            if (!empty($this->qc_defect_category)) {
+                $query = "
+                    SELECT COUNT(*) as count, AVG(CASE 
+                        WHEN qc_severity_level = 'Critical' THEN 4
+                        WHEN qc_severity_level = 'High' THEN 3  
+                        WHEN qc_severity_level = 'Medium' THEN 2
+                        WHEN qc_severity_level = 'Low' THEN 1
+                        ELSE 0 END) as avg_severity
+                    FROM cases 
+                    WHERE qc_defect_category = " . $db->quoted($this->qc_defect_category) . "
+                    AND deleted = 0
+                    AND date_entered >= DATE_SUB(NOW(), INTERVAL 90 DAY)
+                ";
+                
+                $result = $db->query($query);
+                if ($result && $row = $db->fetchByAssoc($result)) {
+                    $metrics['similar_defects_90_days'] = intval($row['count']);
+                    $metrics['avg_severity_score'] = round(floatval($row['avg_severity']), 2);
+                }
+            }
+            
+            // Get metrics for related product
+            if (!empty($this->qc_product_id)) {
+                $query = "
+                    SELECT COUNT(*) as count, 
+                           SUM(qc_quantity_affected) as total_affected
+                    FROM cases 
+                    WHERE qc_product_id = " . $db->quoted($this->qc_product_id) . "
+                    AND deleted = 0
+                    AND date_entered >= DATE_SUB(NOW(), INTERVAL 90 DAY)
+                ";
+                
+                $result = $db->query($query);
+                if ($result && $row = $db->fetchByAssoc($result)) {
+                    $metrics['product_issues_90_days'] = intval($row['count']);
+                    $metrics['total_units_affected'] = intval($row['total_affected']);
+                }
+            }
+            
+        } catch (Exception $e) {
+            LoggerManager::getLogger()->error("Error getting quality metrics: " . $e->getMessage());
+        }
+        
+        return $metrics;
+    }
+
+    /**
+     * Validate quality control fields
+     */
+    public function validateQualityControlFields()
+    {
+        $errors = array();
+        
+        // Check required fields for quality control cases
+        if (!empty($this->qc_defect_category) && empty($this->qc_severity_level)) {
+            $errors[] = "Severity Level is required when Defect Category is specified";
+        }
+        
+        if (!empty($this->qc_batch_number) && empty($this->qc_product_id)) {
+            $errors[] = "Related Product is required when Batch Number is specified";
+        }
+        
+        if (!empty($this->qc_quantity_affected) && intval($this->qc_quantity_affected) <= 0) {
+            $errors[] = "Quantity Affected must be greater than 0";
+        }
+        
+        return $errors;
+    }
 }
