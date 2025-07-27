@@ -1,4 +1,22 @@
 <?php 
+/**
+ * Custom Tab Configuration for SuiteCRM Manufacturing Features
+ * 
+ * The Manufacturing tab has been customized to only include modules where
+ * manufacturing enhancements have been implemented:
+ * 
+ * 1. Home - Manufacturing Overview Dashlet
+ * 2. Accounts - Customer/Supplier management for manufacturing
+ * 3. Opportunities - Enhanced Production Tracking 
+ * 4. AOS_Products - Inventory Monitoring & Threshold Notifications
+ * 5. Cases - Comprehensive Quality Control Subpanel
+ * 6. AOS_Quotes - Detailed Supplier Performance Analytics
+ * 7. AOR_Reports - Internal Manufacturing KPI Calculator
+ * 
+ * This focused view makes it easier to demo the manufacturing features
+ * by showing only the areas where changes have been made.
+ */
+
 $GLOBALS["tabStructure"] =array (
   'LBL_TABGROUP_SALES' => 
   array (
@@ -35,15 +53,12 @@ $GLOBALS["tabStructure"] =array (
     'modules' => 
     array (
       0 => 'Home',
-      1 => 'AOS_Products',
-      2 => 'AOS_Product_Categories',
-      3 => 'AOS_Contracts',
-      4 => 'AOS_Quotes',
-      5 => 'Project',
-      6 => 'Cases',
-      7 => 'Documents',
-      8 => 'Accounts',
-      9 => 'Contacts',
+      1 => 'Accounts',
+      2 => 'Opportunities',
+      3 => 'AOS_Products',
+      4 => 'Cases',
+      5 => 'AOS_Quotes',
+      6 => 'AOR_Reports',
     ),
   ),
   'LBL_TABGROUP_ACTIVITIES' => 

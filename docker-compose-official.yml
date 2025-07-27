@@ -1,0 +1,45 @@
+services:
+  suitecrm-official:
+    image: bertschiweb/suitecrm:7.7.6
+    platform: linux/amd64
+    container_name: suitecrm_official_app
+    ports:
+      - '8082:80'
+    depends_on:
+      - mysql-official
+    environment:
+      - DB_HOST_NAME=mysql-official
+      - DATABASE_NAME=suitecrm_official
+      - DB_USER_NAME=suitecrm_official
+      - DB_PASSWORD=suitecrm_official_password
+      - DB_TYPE=mysql
+      - DB_TCP_PORT=3306
+      - DB_MANAGER=MysqlManager
+    networks:
+      - suitecrm_official_network
+    restart: unless-stopped
+
+  mysql-official:
+    image: mysql:5.7
+    platform: linux/amd64
+    container_name: suitecrm_official_mysql
+    ports:
+      - '3307:3306'
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password_official
+      MYSQL_DATABASE: suitecrm_official
+      MYSQL_USER: suitecrm_official
+      MYSQL_PASSWORD: suitecrm_official_password
+    volumes:
+      - mysql_official_data:/var/lib/mysql
+    networks:
+      - suitecrm_official_network
+    command: --sql_mode="" --character-set-server=utf8 --collation-server=utf8_general_ci
+    restart: unless-stopped
+
+volumes:
+  mysql_official_data:
+
+networks:
+  suitecrm_official_network:
+    driver: bridge 
